@@ -1,0 +1,205 @@
+{% extends 'base_dash.html' %}
+
+{%load static%}
+
+{% comment %} {% block notification %}
+<li class="nav-item dropdown">
+    <a class="nav-link" data-toggle="dropdown" href="#">
+        <i class="far fa-bell" style="color:white; font-size:20px;"></i>
+        <span class="badge badge-warning navbar-badge" id="domainCountBadge">{{ domain_count }}</span>
+    </a>
+    <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
+        <span class="dropdown-item dropdown-header">Domains due expiry</span>
+        <div class="dropdown-divider"></div>
+        
+        <!-- Dynamically generate dropdown items for each domain with days to expiry -->
+        <div id="domainDropdownItems">
+            {% for domain in expiring_domains %}
+            <a href="#" class="dropdown-item">
+                <i class="far fa-circle mr-2"></i>{{ domain.name }}
+                <span class="float-right text-muted text-sm">{{ domain.remaining_days }} days</span>
+            </a>
+            {% endfor %}
+        </div>
+        
+        <div class="dropdown-divider"></div>
+    </div>
+</li>
+{% endblock %} {% endcomment %}
+
+{% block content %}
+<!--preloader-->
+<div class="preloader-container" style="display: none">
+    <div class="spinner"></div>
+</div>
+<style>
+    .preloader-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.8); /* semi-transparent white background */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+
+    .spinner {
+        border: 4px solid rgba(0, 0, 0, 0.1);
+        border-radius: 50%;
+        border-top: 4px solid #3498db;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .ajs-success {
+        background-color: #4CAF50; 
+        color: #ffffff;
+    }
+</style>
+<script src="//cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/alertify.min.js"></script>
+<div class="col-lg-12 mx-1">
+    <div class="jumbotron">
+        <form method="post" action="{% url 'update_domains_result' %}" id="updateDomainsForm">
+            {% csrf_token %}
+            <div class="row">
+                <div class="col-md-8">
+                    <h3 class="display-6 mb-0">Manage Domains</h3>
+                </div>
+                {% if user.is_authenticated and user.is_admin %}
+                <div class="col-md-4 text-right">
+                    <button type="submit" class="btn btn-outline-success" id="updateDomainsButton">
+                        <i class="fas fa-sync-alt"></i> Update Domains
+                    </button>
+                </div>
+                {%endif%}
+            </div>
+        </form>
+        <hr class="my-4">
+
+        <table class="display" id="domainTable">
+            <thead class="border-bottom font-weight-bold">
+                <tr>
+                    <td> Domain Name </td>
+                    <td> Date of Registration</td>
+                    <td> Date of Expiry</td>
+                    <td> Company <br></td>
+                    <td> Registrar Name <br></td>&nbsp;
+                    {% if user.is_authenticated and user.is_admin %}
+                    <td> 
+                        <a href="{% url 'domain_update' %}" class="btn btn-outline-success">
+                        <i class= "fas fa-plus"></i>Add New
+                        </a>
+                    </td>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for domain in domains %}
+                <tr>
+                    <td> {{domain.name}}</td>
+                    <td> {{domain.registration_date}}</td>
+                    <td> {{domain.expiry_date}}</td>
+                    <td> {{domain.company}}</td>
+                    <td> {{domain.registrar_name}}</td>
+                    {% if user.is_authenticated and user.is_admin %}
+                    <td>
+                        <form action="{% url 'domain_delete' domain.id %}" method="post" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn" onclick="return confirm('Are you sure you want to delete domain?')">
+                            <i class="far fa-trash-alt fa-lg text-danger float-right"></i>
+                        </button>
+                        </form>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>    
+        </table>
+    </div>
+</div>
+</div>
+{% endblock content%}
+
+{% block js%}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.css" />
+<script type="text/javascript" src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.js"></script>
+<script type="text/javascript" src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="//cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/alertify.min.js"></script>
+<script>
+    $(document).ready(function () {
+        var table = $('#domainTable').DataTable({
+            lengthChange: false,
+            searching: false,
+            pageLength: 10,
+        });
+    
+        function showPreloader() {
+            var preloader = $('.preloader-container');
+            preloader.css('display', 'flex');
+        }
+    
+        function hidePreloader() {
+            var preloader = $('.preloader-container');
+            preloader.css('display', 'none');
+            var spinner = $('.spinner');
+            spinner.removeClass('spin');
+        }
+    
+        alertify.set('notifier', 'position', 'top-right');
+    
+        function showAlert(message, type) {
+            var alertType = type === 'success' ? 'success' : 'error';
+            alertify.notify(message, alertType, 5);
+        }
+    
+        // Check if there's an error or success message in the messages framework
+        var messagesExist = {{ messages|length }};
+        var errorMessage = "{% if messages %}{% for message in messages %}{% if message.tags == 'error' %}{{ message }}{% endif %}{% endfor %}{% endif %}";
+        var successMessage = "{% if messages %}{% for message in messages %}{% if message.tags == 'success' %}{{ message }}{% endif %}{% endfor %}{% endif %}";
+    
+        // Display Alertify notification based on the message type
+        if (messagesExist) {
+            showAlert(errorMessage || successMessage, errorMessage ? 'error' : 'success');
+        }
+    
+        // Attach a submit event listener to the "Update Domains" button
+        $('#updateDomainsForm').submit(function (event) {
+            event.preventDefault(); // Prevent the default form submission
+            
+            showPreloader(); // Show the preloader before submitting the form
+            
+            $.ajax({
+                url: '{% url "update_domains_result" %}',
+                method: 'POST',
+                data: $(this).serialize(),
+                success: function (data) {
+                    console.log(data); // Debugging: Log the response data to console
+                    hidePreloader(); // Hide the preloader
+                    
+                    // Display success message
+                    showAlert(data.message || successMessage, 'success');
+                    // Refresh the page after 2 seconds (adjust the timeout as needed)
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 3000);
+                },
+                error: function (xhr, status, error) {
+                    hidePreloader(); // Hide the preloader
+                    
+                    // Display error message
+                    showAlert(xhr.responseJSON ? xhr.responseJSON.message || errorMessage : errorMessage, 'error');
+                }
+            });
+        });
+    });
+</script>
+{% endblock%}
