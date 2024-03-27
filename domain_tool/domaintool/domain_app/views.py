@@ -688,7 +688,7 @@ def scheduled_update():
     post_request.method = 'POST'
     update_domains_result(post_request)
 
-schedule.every().thursday.at("22:40").do(scheduled_update)
+schedule.every().wednesday.at("13:02").do(scheduled_update)
         
 class ActiveUserRequiredMixin(LoginRequiredMixin):
     def dispatch(self, request, *args, **kwargs):
